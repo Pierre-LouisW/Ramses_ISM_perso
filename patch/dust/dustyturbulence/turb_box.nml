@@ -1,0 +1,96 @@
+\This namelist contains various input parameters for RAMSES runs
+
+&RUN_PARAMS
+hydro=.true.
+nrestart=12
+ncontrol=1
+verbose=.false.
+dust_diffusion=.true.
+pic=.true.
+tracer=.true.
+/
+
+&AMR_PARAMS
+levelmin=7
+levelmax=7
+ngridmax=100000
+npartmax=1100000
+nexpand=20*4
+boxlen=4.0
+/
+
+! Forced driven turbulence
+&TURB_PARAMS
+turb=.true.
+turb_type=1
+turb_seed=1
+comp_frac=0.5
+turb_T=0.0046667 ! 1/4 crossing time =  autocorrelation time
+turb_Ndt=100
+turb_rms=20000.0
+turb_min_rho=0.01
+/
+
+&INIT_PARAMS
+nregion=1
+region_type(1)='square'
+x_center=4.0
+y_center=4.0
+z_center=4.0
+exp_region=10.0
+length_x=8.0
+length_y=8.0
+length_z=8.0
+d_region=1.1368d3
+p_region=468.d3
+filetype='ascii'
+initfile='ic_part'
+/
+
+&OUTPUT_PARAMS
+! 1 Myr = 0.01595944
+! 80 Myr end time
+tend=1.2767552
+! 2.5 Myr outputs
+delta_tout=0.00398986
+foutput=500
+/
+
+! Uses 'positivity_type=2' and 'pressure_fix=.true.'
+! to avoid crashes due to negative densities
+&HYDRO_PARAMS
+gamma=1.666667
+courant_factor=0.8
+slope_type=1
+!positivity_type=2
+scheme='muscl'
+riemann='hll'
+pressure_fix=.true.
+/
+
+&DUST_PARAMS
+slope_dust=1
+mrn=.true.
+dust_ratio=0.01
+grain_Dens=3.0d0
+reduce_wdust=.true.
+size_min=1.d-7
+size_max=2.d-3
+kwok_correction=.true.
+vmax_barycenter=.false.
+vmax_cs=.true.
+f_vmax=5
+/
+
+&PHYSICS_PARAMS
+isothermal=.true.
+T2_star=10.
+mu_gas=2.31
+/
+
+! Interpolates on primitive variables to avoid crashes due to
+! negative quantities...
+&REFINE_PARAMS
+interpol_var=1
+interpol_type=1
+/

@@ -1,0 +1,14 @@
+.git/
+*.o
+*.so
+*.dylib
+*.exe
+*.bin
+*.mod
+__pycache__/
+*.pyc
+build/
+dist/
+output/
+*.log
+
