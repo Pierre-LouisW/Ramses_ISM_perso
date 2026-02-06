@@ -220,7 +220,7 @@ subroutine condinit(x,u,dx,nn)
 
         IF(rs .le. r0) THEN 
 
-           q(i,id) = d0*(1.0+delta_rho*cos(2.*atan(yy/(cos(theta_mag_radians)*xx-sin(theta_mag_radians)*zz)))) !M=2 perturb
+           q(i,id) = d0*(1.0+delta_rho*cos(2.*atan(yy/(cos(theta_mag_radians)*xx-sin(theta_mag_radians)*zz)))) !M=2 perturbation
            if(Mach .ne. 0)then
               q(i,iu) =  v_rms*(q_idl(1,ind_i,ind_j,ind_k)-vx_tot/dble(count_vrms))
               q(i,iv) =  v_rms*(q_idl(2,ind_i,ind_j,ind_k)-vy_tot/dble(count_vrms))
@@ -587,11 +587,11 @@ subroutine condinit(x,u,dx,nn)
         x(i,2) = x(i,2) - 0.5*boxlen
         x(i,3) = x(i,3) - 0.5*boxlen
 
-       q(i,2) = 0.0d0
-       q(i,3) = 0.0d0
-       q(i,4) = 0.0d0
+        q(i,2) = 0.0d0
+        q(i,3) = 0.0d0
+        q(i,4) = 0.0d0
 
-       !initialise the density field
+        !initialise the density field
         eli =  (x(i,1)/r_0)**2+(x(i,2)/r_0)**2+(x(i,3)/(r_0*rap))**2
 
         if( eli .gt. zeta**2) then 
@@ -619,11 +619,6 @@ subroutine condinit(x,u,dx,nn)
            endif
         else
            q(i,1) = d_c / (1.+eli)
-           if(delta_rho .ne. 0.0d0) then
-              ! PLW Apply M=2 perturbation around the tilted rotation axis, even if bb_test=.false.
-              q(i,1) = q(i,1) * (1.0d0 + delta_rho * &
-     &                 cos(2.0d0*atan((x(i,2)) /(cos(theta_mag_radians)*x(i,1)-sin(theta_mag_radians)*x(i,3)))))
-           endif
            sum_dust = 0.0d0
 #if NDUST>0
            if(mrn) call init_dust_ratio(epsilon_0, dustMRN)

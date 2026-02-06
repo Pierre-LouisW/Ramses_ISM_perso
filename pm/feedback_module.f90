@@ -881,8 +881,7 @@ subroutine make_fb_fixed(currlevel,isn)
   real(dp), dimension(1:twotondim, 1:3):: xc
   logical, dimension(1:nvector), save:: ok
 
-  ! real(dp),dimension(1:ndim):: sn_cent
-  real(dp),dimension(3):: sn_cent   ! length-3 even in 2D; z stays 0 - PLW
+  real(dp),dimension(1:ndim):: sn_cent
   real(dp), dimension(1:nvector, 1:ndim), save:: xx
   real(dp):: sn_r, sn_m, sn_e, sn_vol, sn_d, sn_ed, dx_sel, sn_p, sn_v
   real(dp):: rr
@@ -923,12 +922,7 @@ subroutine make_fb_fixed(currlevel,isn)
   sn_v = sn_v / scale_v
   sn_cent(1)= FB_pos_x(isn)*boxlen
   sn_cent(2)= FB_pos_y(isn)*boxlen
-  ! sn_cent(3)= FB_pos_z(isn)*boxlen
-#if NDIM==3
   sn_cent(3)= FB_pos_z(isn)*boxlen
-#else
-  sn_cent(3)= 0.0_dp
-#endif
 
   ! HACK - force Courant condition on winds before first hydro step
   ! TODO: think about how this is synchronised more carefully
@@ -952,12 +946,7 @@ subroutine make_fb_fixed(currlevel,isn)
      
   if(myid .eq. 1 .and. FB_sourcetype(isn) .eq. 'supernova') then
      write(*,*) 'Supernova blast! Wow!'
-    !  write(*,*) 'x_sn, y_sn, z_sn, ',sn_cent(1),sn_cent(2),sn_cent(3)
-#if NDIM==3
-    write(*,*) 'x_sn, y_sn, z_sn, ',sn_cent(1),sn_cent(2),sn_cent(3)
-#else
-    write(*,*) 'x_sn, y_sn', sn_cent(1),sn_cent(2)
-#endif
+     write(*,*) 'x_sn, y_sn, z_sn, ',sn_cent(1),sn_cent(2),sn_cent(3)
   endif
 
   ! Loop over levels

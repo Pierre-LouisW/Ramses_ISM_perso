@@ -41,7 +41,7 @@ subroutine read_params
        & ,dust_diffusion &
 #endif       
        & ,static_dm,static_gas,static_stars,convert_birth_times,use_proper_time,remap_pscalar &
-       & ,FLD,tracer,extinction,stellar &
+       & ,FLD,tracer,extinction,stellar,lagrangian_dust &
        & ,x_load_balance,y_load_balance,z_load_balance,angular_auto_center,angular_auto_min_rho
   namelist/output_params/noutput,foutput,aout,tout &
        & ,tend,delta_tout,aend,delta_aout,gadget_output,walltime_hrs,minutes_dump,write_conservative &

@@ -169,6 +169,9 @@ subroutine init_opacities
   real(dp)                                :: nu1,nu2,op1,op2,m,slope,dnu,kappa_min,grad1,grad2,minmod
   character (len=200)                     :: opfilename,fname
   logical , dimension(:,:,:), allocatable :: i_am_a_hole
+  integer                                 :: ngrp_eff
+
+  ngrp_eff = max(1,ngrp) !PLW Federrath
 
   if(opacity_type == 'multigroup')then
 
@@ -413,7 +416,7 @@ subroutine init_opacities
         if(myid==1) write(*,*) 'Computing regular mesh of opacities'
 
         allocate(bin_count(nx_opmesh,ny_opmesh,nz_opmesh),i_am_a_hole(nx_opmesh,ny_opmesh,nz_opmesh))
-        allocate(kappa_opmesh_p(ngrp,nx_opmesh,ny_opmesh,nz_opmesh),kappa_opmesh_r(ngrp,nx_opmesh,ny_opmesh,nz_opmesh))
+        allocate(kappa_opmesh_p(ngrp_eff,nx_opmesh,ny_opmesh,nz_opmesh),kappa_opmesh_r(ngrp_eff,nx_opmesh,ny_opmesh,nz_opmesh))
         allocate(x_opmesh(nx_opmesh),y_opmesh(ny_opmesh),z_opmesh(nz_opmesh))
 
         dx_opmesh = (dmax_opmesh-dmin_opmesh)/real(nx_opmesh-1,dp)
@@ -606,8 +609,8 @@ subroutine init_opacities
         read (80) x_opmesh
         read (80) y_opmesh
         read (80) z_opmesh
-        read (80) kappa_opmesh_p(1:ngrp,1:nx_opmesh,1:ny_opmesh,1:nz_opmesh)
-        read (80) kappa_opmesh_r(1:ngrp,1:nx_opmesh,1:ny_opmesh,1:nz_opmesh)
+        read (80) kappa_opmesh_p(1:ngrp_eff,1:nx_opmesh,1:ny_opmesh,1:nz_opmesh)
+        read (80) kappa_opmesh_r(1:ngrp_eff,1:nx_opmesh,1:ny_opmesh,1:nz_opmesh)
         close(80)
 
      end if
@@ -640,7 +643,7 @@ subroutine init_opacities
      read (78) nx_opmesh,ny_opmesh,nz_opmesh,dx_opmesh,dy_opmesh,dz_opmesh,dmin_opmesh,dmax_opmesh,tmin_opmesh,tmax_opmesh,trmin_opmesh,trmax_opmesh
 
      allocate(x_opmesh(nx_opmesh),y_opmesh(ny_opmesh),z_opmesh(nz_opmesh))
-     allocate(kappa_opmesh_p(ngrp,nx_opmesh,ny_opmesh,nz_opmesh),kappa_opmesh_r(ngrp,nx_opmesh,ny_opmesh,nz_opmesh))
+     allocate(kappa_opmesh_p(ngrp_eff,nx_opmesh,ny_opmesh,nz_opmesh),kappa_opmesh_r(ngrp_eff,nx_opmesh,ny_opmesh,nz_opmesh))
 
      read (78) x_opmesh
      read (78) y_opmesh
@@ -649,11 +652,11 @@ subroutine init_opacities
      read (78) kappa_opmesh_r(1,1:nx_opmesh,1:ny_opmesh,1:nz_opmesh)
      close(78)
 
-     if(ngrp .gt. 1)then
+     if(ngrp_eff .gt. 1)then
         do k = 1,nz_opmesh
            do j = 1,ny_opmesh
               do i = 1,nx_opmesh
-                 do igroup=2,ngrp
+                 do igroup=2,ngrp_eff
                     kappa_opmesh_p(igroup,i,j,k) = kappa_opmesh_p(1,i,j,k)
                     kappa_opmesh_r(igroup,i,j,k) = kappa_opmesh_r(1,i,j,k)
                  end do
@@ -808,6 +811,9 @@ function rosseland_ana(dens,Tp,Tr,igroup,insink)
   ! Conversion factor from user units to cgs units
   call units(scale_l,scale_t,scale_d,scale_v,scale_nH,scale_T2)
 
+!   if(myid==1) write(*,*) &
+!        'ROSS in: dens,Tp,Tr,igroup,insink=', dens,Tp,Tr,igroup,insink
+
   if(sublimation_kuiper) then
      !# RMR #### Sublimation of dust grains as in kuiper+10 ApJ ####
      !### The highest dust temperature is the evaporation temperature
@@ -826,6 +832,7 @@ function rosseland_ana(dens,Tp,Tr,igroup,insink)
      y = log10(Tp)
   endif
   z = log10(Tr)
+!   if(myid==1) write(*,*) 'log10 xyz =', x,y,z
   if(stellar_photon)then
      if(igroup==1 .and. maxval(Teff_sink).gt.0)z = log10(maxval(Teff_sink)) 
   end if
@@ -833,11 +840,17 @@ function rosseland_ana(dens,Tp,Tr,igroup,insink)
   ival = floor((x - x_opmesh(1)) / dx_opmesh) + 1
   jval = floor((y - y_opmesh(1)) / dy_opmesh) + 1
   kval = floor((z - z_opmesh(1)) / dz_opmesh) + 1
+
+!   write(*,*) 'Rosseland indices 1: ',ival,jval,kval
   
   ! enforce to be in the table
   ival = min(max(ival,1),nx_opmesh)
   jval = min(max(jval,1),ny_opmesh)
   kval = min(max(kval,1),nz_opmesh)
+
+!   if(myid==1) write(*,'(A,3I8)') 'indices ival,jval,kval =', ival,jval,kval
+
+!  write(*,*) 'Rosseland indices 2: ',ival,jval,kval
 
   ! Perform tri-linear interpolation
   
@@ -852,27 +865,50 @@ function rosseland_ana(dens,Tp,Tr,igroup,insink)
   dx = (x-x0)/(x1-x0)
   dy = (y-y0)/(y1-y0)
   dz = (z-z0)/(z1-z0)
+
+!   if(myid==1) write(*,*) 'dx,dy,dz =', dx,dy,dz
   
   ! First linear interpolation along x
   c00 = kappa_opmesh_r(igroup,ival  ,jval  ,kval  )*(1.0_dp-dx) + kappa_opmesh_r(igroup,ival+1,jval  ,kval  )*dx
   c10 = kappa_opmesh_r(igroup,ival  ,jval+1,kval  )*(1.0_dp-dx) + kappa_opmesh_r(igroup,ival+1,jval+1,kval  )*dx
   c01 = kappa_opmesh_r(igroup,ival  ,jval  ,kval+1)*(1.0_dp-dx) + kappa_opmesh_r(igroup,ival+1,jval  ,kval+1)*dx
   c11 = kappa_opmesh_r(igroup,ival  ,jval+1,kval+1)*(1.0_dp-dx) + kappa_opmesh_r(igroup,ival+1,jval+1,kval+1)*dx
+
+!   if(myid==1) then
+!      write(*,*) 'kappa corners:', &
+!           kappa_opmesh_r(igroup,ival  ,jval  ,kval  ), &
+!           kappa_opmesh_r(igroup,ival+1,jval  ,kval  ), &
+!           kappa_opmesh_r(igroup,ival  ,jval+1,kval  ), &
+!           kappa_opmesh_r(igroup,ival+1,jval+1,kval  ), &
+!           kappa_opmesh_r(igroup,ival  ,jval  ,kval+1), &
+!           kappa_opmesh_r(igroup,ival+1,jval  ,kval+1), &
+!           kappa_opmesh_r(igroup,ival  ,jval+1,kval+1), &
+!           kappa_opmesh_r(igroup,ival+1,jval+1,kval+1)
+!      write(*,*) 'c00 c10 c01 c11 =', c00,c10,c01,c11
+!   end if
   
   ! Second linear interpolation along y
   c0 = c00*(1.0_dp-dy) + c10*dy
   c1 = c01*(1.0_dp-dy) + c11*dy
+
+!   if(myid==1) write(*,*) 'c0 c1 =', c0,c1
   
   ! Third linear interpolation along z
   rosseland_ana = c0*(1.0_dp-dz) + c1*dz
   
   rosseland_ana = dens*10.0_dp**(rosseland_ana)
 
+!   if(myid==1) write(*,*) 'ross raw/final =', c0*(1.0_dp-dz)+c1*dz, rosseland_ana
+
+!   if(myid==1) write(*,*) 'table init? first val=', any(kappa_opmesh_r /= 0.0_dp), kappa_opmesh_r(igroup,1,1,1)
+
   if(sublimation_kuiper) then
      !# RMR ## Sublimation mimicked by a d/g ratio that decreases as a arctan function centered on Tevap ##
      rosseland_ana = rosseland_ana*(0.5d0 - 1./pi*atan(0.01d0*(Tp - Tevap) ) ) & !ross_ana contains the d/g ratio of 0.01
           +dens*0.01d0*(1.0d0-0.01d0*(0.5d0 - 1./pi*atan(0.01d0*(Tp - Tevap) ) )) !=> quasi full gas
   endif
+
+!   write(*,*) 'Rosseland opacity = ',rosseland_ana, ' at dens=',dens,' Tp=',Tp,' Tr=',Tr, rosseland_ana/dens !PLW Federrath
 
   if (sinks_opt_thin .and. insink) rosseland_ana = min_optical_depth/(0.5D0**nlevelmax*boxlen*scale_l)
 

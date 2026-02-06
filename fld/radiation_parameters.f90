@@ -194,8 +194,6 @@ function rosseland_ana(dens,Tp,Tr,igroup,insink)
           +dens*0.01d0*(1.0d0-0.01d0*(0.5d0 - 1./pi*atan(0.01d0*(Tp - Tevap) ) )) !=> quasi full gas
   endif
 
-  write(*,*) 'Rosseland opacity = ', rosseland_ana, ' dens = ', dens, ' Tp = ', Tp, rosseland_ana/dens !PLW test
- 
   if (sinks_opt_thin .and. insink) rosseland_ana = min_optical_depth/(0.5D0**nlevelmax*boxlen*scale_l)
 
 end function rosseland_ana

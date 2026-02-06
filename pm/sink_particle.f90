@@ -1791,7 +1791,12 @@ subroutine make_sink_from_clump(ilevel)
                  sum_dust=sum_dust+uold(ind_cell_new(i),firstindex_ndust+idust)/d
               end do
 #endif               
-              call temperature_eos(d*(1.0d0-sum_dust),eint,temp,ht)
+              !PLW Federrath compute cell centre and pass to barotropic EOS
+              x(1)=(xg(ind_grid_new(i),1)+xc(ind,1)-skip_loc(1))*scale
+              x(2)=(xg(ind_grid_new(i),2)+xc(ind,2)-skip_loc(2))*scale
+              x(3)=(xg(ind_grid_new(i),3)+xc(ind,3)-skip_loc(3))*scale
+              call temperature_eos(d*(1.0d0-sum_dust),eint,temp,ht,x)
+            !   write(*,*) 'testD', x, temp, x(1), x(2), x(3)    
               
 
               do ivar=imetal,lastindex_pscal
@@ -1799,9 +1804,7 @@ subroutine make_sink_from_clump(ilevel)
               end do
 
               ! Get density maximum by quadratic expansion around cell center
-              x(1)=(xg(ind_grid_new(i),1)+xc(ind,1)-skip_loc(1))*scale
-              x(2)=(xg(ind_grid_new(i),2)+xc(ind,2)-skip_loc(2))*scale
-              x(3)=(xg(ind_grid_new(i),3)+xc(ind,3)-skip_loc(3))*scale
+              ! x(1:3) already computed above
               call true_max(x(1),x(2),x(3),nlevelmax)
 
               ! Mass of the new sink

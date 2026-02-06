@@ -430,7 +430,9 @@ subroutine compute_clump_properties_round2
 
 #endif 
         call pressure_eos((1.0d0-sum_dust)*d,eint,p) 
-        call temperature_eos((1.0d0-sum_dust)*d,eint,T2,ht)        
+        !PLW Federrath pass actual cell position to barotropic EOS
+        call temperature_eos((1.0d0-sum_dust)*d,eint,T2,ht,xcell)  
+      !   write(*,*) 'testC' xcell, T2, xcell(1), xcell(2), xcell(3)          
 
 
         ! add radiation pressure by non-thermal gas (radiation or cosmic rays) ! WARNING DOES NOT WORK FOR 2 TEMP - ELECTRONIC CONDUCTION 
@@ -1218,4 +1220,3 @@ subroutine surface_int_np(ind_cell,np,ilevel)
 
 end subroutine surface_int_np
 #endif
-

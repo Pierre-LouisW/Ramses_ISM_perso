@@ -177,7 +177,9 @@ subroutine make_boundary_diffusion(ilevel,igroup)
                        sum_dust = sum_dust + uu(i,firstindex_ndust+idust)/rho
                     end do
 #endif           
-                    call temperature_eos((1.0d0-sum_dust)*rho,eps,t2,ht)                    
+                    !PLW Federrath pass real cell centre to barotropic EOS
+                    call temperature_eos((1.0d0-sum_dust)*rho,eps,t2,ht,xx(i,1:ndim)) 
+                    write(*,*) 'testA',xx(i,1:ndim), t2, xx(i,1), xx(i,2), xx(i,3)       
                     t2    = Tr_floor ! comment this for radiative shock
 
                     unew(ind_cell(i),nvar+3) = t2
@@ -190,7 +192,7 @@ subroutine make_boundary_diffusion(ilevel,igroup)
                     
                     ! Compute Rosseland opacity
                     t2r = cal_Teg(unew(ind_cell(i),firstindex_er+igroup)*scale_E0,igroup)
-                    divu(ind_cell(i))= rosseland_ana(dd*scale_d,t2,t2r,igroup)/scale_kappa
+                    divu(ind_cell(i))= rosseland_ana(dd*scale_d,t2,t2r,igroup,.false.)/scale_kappa
                     if(divu(ind_cell(i))*dx_loc .lt. min_optical_depth) divu(ind_cell(i))=min_optical_depth/dx_loc
                     
                  end if
@@ -401,7 +403,9 @@ subroutine make_boundary_diffusion_tot(ilevel)
                        sum_dust = sum_dust + uu(i,firstindex_ndust+idust)/rho
                     end do
 #endif       
-                    call temperature_eos((1.0_dp-sum_dust)*rho,eps,t2,ht)
+                    !PLW Federrath pass real cell centre to barotropic EOS
+                    call temperature_eos((1.0_dp-sum_dust)*rho,eps,t2,ht,xx(i,1:ndim))
+                    write(*,*) 'testB', xx(i,1:ndim), t2, xx(i,1), xx(i,2), xx(i,3)    
                     
 #if NGRP>0
                     uu(i,ind_trad(1)) = t2
@@ -412,7 +416,7 @@ subroutine make_boundary_diffusion_tot(ilevel)
                     ! Compute Rosseland opacity
                     do igroup=1,ngrp
                        t2r = cal_Teg(uu(i,firstindex_er+igroup)*scale_d*scale_v**2,igroup)
-                       kappaR_bicg(ind_cell(i),igroup)= rosseland_ana(dd*scale_d,uu(i,ind_trad(1)),t2r,igroup)/scale_kappa
+                       kappaR_bicg(ind_cell(i),igroup)= rosseland_ana(dd*scale_d,uu(i,ind_trad(1)),t2r,igroup,.false.)/scale_kappa
                        if( kappaR_bicg(ind_cell(i),igroup)*dx_loc .lt. min_optical_depth)  kappaR_bicg(ind_cell(i),igroup)=min_optical_depth/dx_loc
                     enddo
 #endif

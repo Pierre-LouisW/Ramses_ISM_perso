@@ -5742,7 +5742,8 @@ do k=min(1,ku1+1),max(1,ku2-1)
 !                     endif
 
                     if(barotrop)then
-                       tcellf=barotrop1D(rhof*scale_d)
+                       tcellf=barotrop1D(rhof*scale_d) !PLW Federrath TODO
+                       write(*,*) 'Warning: PLW TEST - include x_cell'
                     elseif(ntestDADM.eq.1)then
                        tcellf=1.0d0
                     else

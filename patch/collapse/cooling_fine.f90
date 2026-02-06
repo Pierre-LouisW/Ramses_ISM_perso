@@ -131,6 +131,7 @@ subroutine coolfine1(ind_grid,ngrid,ilevel)
 #endif
 
   real(dp) :: barotrop1D,mincolumn_dens
+  real(dp) :: x_cell(1:ndim)
   real(dp)                                   :: x0, y0, z0,coeff_chi,cst2, coef
   double precision                           :: v_extinction,extinct
   integer::uleidx,uleidy,uleidz,uleidh,igrid,ii,indc2,iskip2,ind_ll
@@ -637,16 +638,24 @@ subroutine coolfine1(ind_grid,ngrid,ilevel)
         do i=1,nleaf
            sum_dust =0.0d0
 #if NDUST>0           
-           do idust = 1, ndust
-              sum_dust=sum_dust+uold(ind_leaf(i),firstindex_ndust+idust)/nH(i)
+           do idust = 1, ndust 
+              sum_dust=sum_dust+uold(ind_leaf(i),firstindex_ndust+idust)/nH(i) !
            end do
 #endif       
-           T2min(i) = barotrop1D((1.0d0-sum_dust)*nH(i)*scale_d) 
+           ! Convert cell center from index units to code-length units
+           x_cell(1)=(xg(ind_grid(ind_leaf_loc(i)),1)+xc(ind,1)-skip_loc(1))*scale
+#if NDIM>1
+           x_cell(2)=(xg(ind_grid(ind_leaf_loc(i)),2)+xc(ind,2)-skip_loc(2))*scale
+#endif
+#if NDIM>2
+           x_cell(3)=(xg(ind_grid(ind_leaf_loc(i)),3)+xc(ind,3)-skip_loc(3))*scale
+#endif
+           T2min(i) = barotrop1D((1.0d0-sum_dust)*nH(i)*scale_d, x_cell)  !PLW Barotropic EOS - returns T in K
         enddo
      end if
 
    !   if(cooling)then
-   !      ! Compute thermal temperature by subtracting polytrope !PLW
+   !      ! Compute thermal temperature by subtracting polytrope
    !      do i=1,nleaf
    !         T2(i) = min(max(T2(i)-T2min(i),T2_min_fix),T2max)
    !      end do
@@ -780,7 +789,7 @@ subroutine coolfine1(ind_grid,ngrid,ilevel)
 !     if(neq_chem) then
 !        T2_new(1:nleaf) = T2(1:nleaf)
 !        call rt_solve_cooling(T2_new, xion, Np, Fp, p_gas, dNpdt, dFpdt  &
-!                         , nH, cooling_on, Zsolar, dtcool, aexp_loc,nleaf) !PLW in order to use same cooling with ISM sims
+!                         , nH, cooling_on, Zsolar, dtcool, aexp_loc,nleaf)
 !        delta_T2(1:nleaf) = T2_new(1:nleaf) - T2(1:nleaf)
 !     endif
 !#endif
@@ -913,7 +922,7 @@ subroutine coolfine1(ind_grid,ngrid,ilevel)
         do i=1,nleaf
            uold(ind_leaf(i),ndim+2) = T2min(i) + ekk(i) + err(i) + emag(i)
         end do
-     else if(cooling .or. neq_chem)then !.and. .not.fld) !PLW remove not fld to match main ramses cooling.
+     else if((cooling .or. neq_chem) .and. .not.fld)then
         do i=1,nleaf
            uold(ind_leaf(i),ndim+2) = T2(i) + T2min(i) + ekk(i) + err(i) + emag(i)
         end do
@@ -1131,7 +1140,7 @@ end subroutine pressure_eos
 !===========================================================================================
 !===========================================================================================
 !===========================================================================================
-subroutine temperature_eos(rho_temp,Enint_temp,Teos,ht)
+subroutine temperature_eos(rho_temp,Enint_temp,Teos,ht,x_cell)
   use amr_commons
   use hydro_commons
   use units_commons
@@ -1153,6 +1162,8 @@ subroutine temperature_eos(rho_temp,Enint_temp,Teos,ht)
   integer :: ir,ie
   real(dp):: xx,drho,dener
   real(dp) :: barotrop1D
+  real(dp),intent(in),optional :: x_cell(1:ndim)
+  real(dp) :: x_cell_dummy(1:ndim)
 
 if(eos)then
   if (enint_temp ==0.d0) then
@@ -1218,7 +1229,14 @@ if(eos)then
      endif
   endif
   else if(barotrop)then
-     Teos=barotrop1D(rho_temp*scale_d)
+     if(present(x_cell))then
+        Teos=barotrop1D(rho_temp*scale_d,x_cell)
+      !   write(*,*) '!PLW Federrath', x_cell(1)
+     else 
+        x_cell_dummy(:)=boxlen*1.0d6 !
+        Teos=barotrop1D(rho_temp*scale_d,x_cell_dummy)
+        write(*,*) 'warning: temperature_eos called without x_cell argument in barotropic EOS' !PLW Federrath
+     endif
   else 
      rho   = rho_temp*scale_d
      Enint = Enint_temp*scale_d*scale_v**2 
@@ -1487,17 +1505,75 @@ end function cmp_Cv_eos
 !==================================================================================
 !==================================================================================
 !==================================================================================
-double precision function barotrop1D(rhon)
+real(dp) function barotrop1D(rhon,x_cell)
   use hydro_commons
   use amr_parameters, only : n_star
   use radiation_parameters, only : Tr_floor
+  use pm_parameters, only : nsink
+  use constants, only: pi
+  use units_commons, only: scale_kappa
   implicit none
 
-  real(dp)::inp,ll,rhon
+  real(dp),intent(in)           :: rhon
+  real(dp),intent(in)           :: x_cell(1:ndim)
+  real(dp)::inp,ll
   integer :: j
 
+  real(dp) :: scale_nH,scale_T2,scale_l,scale_d,scale_t,scale_v
+  real(dp) :: temp_polytrope,distance_sink_code,distance_sink_cgs
+  real(dp) :: kappa_IR_loc,tau_sink,flux_star
+  real(dp) :: T_poly_K,T_kappa_K,T_tot_K
+  real(dp), parameter :: sigma_sb = 5.670374419e-5_dp ! Stefan-Boltzmann constant [erg s-1 cm-2 K-4]
+  real(dp), parameter :: kappa_avg = 0.1d0             ! cm^2/g
+  real(dp), parameter :: rho_0    = 1.0e-12_dp        ! g/cc
+  real(dp), parameter :: L_star   = 3.828e33_dp        ! erg/s (1 L_sun)!
+  real(dp), parameter :: au       = 1.496e+13_dp       ! cm
+  real(dp), external :: cell_sink_distance
+  real(dp), external :: rosseland_ana
+!   real(dp), parameter :: Temptest = 10.0d0
+!   real(dp) :: Kappa_1, Kappa_2, Kappa_3, Kappa_4
+
+  ! Analytical barotrope: returns gas temperature in K.
+  ! rhon is input mass density in g/cc.
   if(analytical_barotrop)then
-     barotrop1D = Tr_floor * ( 1.0d0 + (rhon/n_star)**(gamma-1.0d0) )
+     temp_polytrope = Tr_floor * ( 1.0d0 + (rhon/n_star)**(gamma-1.0d0) )
+   !   if(nsink>0)then
+   !      call units(scale_l,scale_t,scale_d,scale_v,scale_nH,scale_T2)
+   !    !   write(*,*) 'Barotrop1D: rhon=',rhon,' g/cc'
+   !    !   Kappa_1 = rosseland_ana(rhon, 10.d0, 10.d0, 1.d0, .false.) / rhon
+   !    !   Kappa_2 = rosseland_ana(rhon, 1000.d0, 1000.d0, 1.d0, .false.) / rhon
+   !    !   Kappa_3 = rosseland_ana(rhon, 1000.d0,  10.d0, 1.d0, .false.) / rhon
+   !    !   Kappa_4 = rosseland_ana(rhon, 10.d0, 1000.d0, 1.d0, .false.) / rhon
+   !    !   write(*,*) '1,2,3,4', Kappa_1, Kappa_2, Kappa_3, Kappa_4
+
+   !      T_poly_K = temp_polytrope
+   !      distance_sink_code = cell_sink_distance(x_cell) !PLW TEST1
+   !    !   write(*,*) 'distance_sink_code=',distance_sink_code,' code units'
+
+   !      if(distance_sink_code>0.0d0 .and. distance_sink_code<huge(1.0d0))then
+   !         distance_sink_cgs  =  distance_sink_code * scale_l 
+
+   !       !   kappa_IR_loc = rosseland_ana(rhon, T_poly_K, T_poly_K, 1, .false.) / rhon
+   !       !   write(*,*) 'Barotrop1D: kappa_IR_loc=',kappa_IR_loc,' cm^2/g'
+   !       !   write(*,*) 'Barotrop1D: rho=',rhon,' g/cc, distance_sink=',distance_sink_cgs,' cm, kappa_IR_loc=',kappa_IR_loc,' cm^2/g'
+   !       !   tau_sink = kappa_avg * rho_0 *((1.0d0/(au*0.12_dp))-(1.0d0/distance_sink_cgs)) * (au*0.12_dp)**2 !distance_sink_cgs
+   !       !   tau_sink = max(tau_sink,0.0d0)
+   !       !   write(*,*) 'Barotrop1D: distance_sink_AU=',distance_sink_cgs/au,' AU'
+   !       !   write(*,*) 'Barotrop1D: tau_sink=',tau_sink
+
+   !         flux_star = L_star / (4.0d0*pi*distance_sink_cgs**2) !* exp(-tau_sink) PLW spherical model
+   !         T_kappa_K =  (flux_star / (4.0d0 * sigma_sb))**0.25_dp !(kappa_IR_loc / kappa_avg) *
+   !       !   T_tot_K = ( T_poly_K**4 + T_kappa_K**4 )**0.25_dp
+   !         T_tot_K = max(T_poly_K, T_kappa_K) !Max test 
+   !         barotrop1D = T_tot_K
+   !       !   write(*,*) 'Barotrop1D: rho=',rhon,' g/cc, T_poly=',T_poly_K,' K, T_kappa=',T_kappa_K,' K, T_tot=',T_tot_K,' K'
+   !      else
+   !         barotrop1D = temp_polytrope
+      !   endif
+   !   else
+        barotrop1D = temp_polytrope
+   !   endif
+
   else
      inp=rhon ! in g.cc
      ll=(1.d0+(log10(inp)-rhomin_barotrop)/drho_barotrop)
@@ -1505,5 +1581,44 @@ double precision function barotrop1D(rhon)
      barotrop1D=(ll-j)*(temp_barotrop(j+1))+(1.d0-(ll-j))*(temp_barotrop(j))
      barotrop1D=10.0d0**barotrop1D     ! temperature in K
   endif
-
 end function barotrop1D
+
+function cell_sink_distance(x_cell) result(dist)
+  use amr_parameters, only: dp, ndim
+  use amr_commons,   only: boxlen, nx, ny, nz
+  use pm_commons,    only: xsink
+  use pm_parameters, only: nsink
+  implicit none
+
+  real(dp), intent(in) :: x_cell(1:ndim)
+  real(dp)             :: dist
+  real(dp)             :: dx_loc(1:ndim)
+  logical              :: period(1:ndim)
+  integer              :: idim
+  integer, parameter   :: isink = 1   ! single sink assumed
+
+  if(nsink < 1)then
+     dist = huge(1.0_dp)
+     return
+  end if
+
+  period(1) = (nx == 1)
+  if (ndim > 1) period(2) = (ny == 1)
+  if (ndim > 2) period(3) = (nz == 1)
+
+  dist = 0.0_dp
+  do idim = 1, ndim
+   !   write(*,*) 'x_cell(',idim,')=',x_cell(idim), ' xsink=',xsink(isink,idim)
+     dx_loc(idim) = xsink(isink,idim) - x_cell(idim)
+
+     if (period(idim)) then
+        if (dx_loc(idim) >  0.5_dp*boxlen) dx_loc(idim) = dx_loc(idim) - boxlen
+        if (dx_loc(idim) < -0.5_dp*boxlen) dx_loc(idim) = dx_loc(idim) + boxlen
+     end if
+
+     dist = dist + dx_loc(idim)**2
+  end do
+  dist = sqrt(dist)
+!   write(*,*) 'cell_sink_distance=',dist
+
+end function cell_sink_distance

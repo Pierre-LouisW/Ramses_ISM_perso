@@ -1055,6 +1055,11 @@ subroutine read_hydro_params(nml_ok)
         endif
         opacity_type = 'multigroup'
      endif
+  end if
+
+  ! Always build opacity tables when either FLD is on or barotropic polytrope-kappa
+  ! needs rosseland_ana (even if FLD=0).
+  if(fld .or. barotrop)then !PLW Federrath
      call init_opacities
   end if
  

@@ -512,6 +512,11 @@ subroutine backup_hydro(filename)
   integer,allocatable,dimension(:)::ind_grid
   real(dp)::cmp_temp,p
   real(dp),allocatable,dimension(:)::xdp
+  real(dp),dimension(1:3)::skip_loc,x_cell
+  real(dp),dimension(1:twotondim,1:3)::xc
+  real(dp)::scale,dx
+  integer :: ix,iy,iz,nx_loc
+  real(dp)::scale_l,scale_t,scale_d,scale_v,scale_nH,scale_T2
   character(LEN=5)::nchar
   character(LEN=80)::fileloc
   integer,parameter::tag=1121
@@ -523,6 +528,7 @@ subroutine backup_hydro(filename)
 #if NDUST>0
   integer :: idust,idust_pscal
 #endif  
+  real(dp) :: barotrop1D
   if(verbose)write(*,*)'Entering backup_hydro'
 
   ilun=ncpu+myid+10
@@ -571,6 +577,22 @@ subroutine backup_hydro(filename)
         write(ilun)ilevel
         write(ilun)ncache
         if(ncache>0)then
+           dx=0.5d0**ilevel
+           nx_loc=icoarse_max-icoarse_min+1
+           skip_loc=(/0.0d0,0.0d0,0.0d0/)
+           if(ndim>0)skip_loc(1)=dble(icoarse_min)
+           if(ndim>1)skip_loc(2)=dble(jcoarse_min)
+           if(ndim>2)skip_loc(3)=dble(kcoarse_min)
+           scale=boxlen/dble(nx_loc)
+           do ind=1,twotondim
+              iz=(ind-1)/4
+              iy=(ind-1-4*iz)/2
+              ix=(ind-1-2*iy-4*iz)
+              if(ndim>0)xc(ind,1)=(dble(ix)-0.5_dp)*dx
+              if(ndim>1)xc(ind,2)=(dble(iy)-0.5_dp)*dx
+              if(ndim>2)xc(ind,3)=(dble(iz)-0.5_dp)*dx
+           end do
+           call units(scale_l,scale_t,scale_d,scale_v,scale_nH,scale_T2)
            allocate(ind_grid(1:ncache),xdp(1:ncache))
            ! Loop over level grids
            igrid=istart
@@ -766,14 +788,27 @@ subroutine backup_hydro(filename)
                     end do
 #endif
                  endif
-                 sum_dust=0.0d0
+                 sum_dust=0.0d0 !PLW Federrath start - correct temperature dump for federrath barotrop
 #if NDUST>0
                  do idust=1,ndust
                     sum_dust=sum_dust+uold(ind_grid(i)+iskip,firstindex_ndust+idust)/d
                  end do
-#endif                    
-                 call temperature_eos((1.0d0-sum_dust)*d,e,cmp_temp,ht)                 
-                 xdp(i)=cmp_temp
+#endif           
+               if(barotrop)then                 
+                  x_cell(1)=(xg(ind_grid(i),1)+xc(ind,1)-skip_loc(1))*scale
+#if NDIM>1
+                  x_cell(2)=(xg(ind_grid(i),2)+xc(ind,2)-skip_loc(2))*scale
+#endif
+#if NDIM>2
+                  x_cell(3)=(xg(ind_grid(i),3)+xc(ind,3)-skip_loc(3))*scale
+#endif
+                  cmp_temp = barotrop1D((1.0d0-sum_dust)*d*scale_d, x_cell)!PLW end
+                  ! write(*,*) "TOTO1 !PLW", (1.0d0-sum_dust)*d*scale_d, cmp_temp
+               else
+                  call temperature_eos((1.0d0-sum_dust)*d,e,cmp_temp,ht)
+                  ! write(*,*) "TOTO2 !PLW"
+               end if
+               xdp(i)=cmp_temp
               end do
               write(ilun)xdp
 #if NDUST>0
