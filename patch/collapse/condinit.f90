@@ -619,6 +619,12 @@ subroutine condinit(x,u,dx,nn)
            endif
         else
            q(i,1) = d_c / (1.+eli)
+           if(delta_rho .ne. 0.0d0) then
+              ! PLW Apply M=2 perturbation around the tilted rotation axis, even if bb_test=.false.
+              q(i,1) = q(i,1) * (1.0d0 + delta_rho * &
+     &                 cos(2.0d0*atan((x(i,2)) /(cos(theta_mag_radians)*x(i,1)-sin(theta_mag_radians)*x(i,3)))))
+               write(*,*) 'max density with perturbation ',q(i,1)
+           endif
            sum_dust = 0.0d0
 #if NDUST>0
            if(mrn) call init_dust_ratio(epsilon_0, dustMRN)

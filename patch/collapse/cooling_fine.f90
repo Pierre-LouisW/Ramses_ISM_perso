@@ -922,7 +922,8 @@ subroutine coolfine1(ind_grid,ngrid,ilevel)
         do i=1,nleaf
            uold(ind_leaf(i),ndim+2) = T2min(i) + ekk(i) + err(i) + emag(i)
         end do
-     else if((cooling .or. neq_chem) .and. .not.fld)then
+      else if(cooling .or. neq_chem)then !.and. .not.fld) !PLW remove not fld to match main ramses cooling.
+        write(*,*) 'PLW TESt - should not appear if Federrath Heating'
         do i=1,nleaf
            uold(ind_leaf(i),ndim+2) = T2(i) + T2min(i) + ekk(i) + err(i) + emag(i)
         end do
@@ -1537,42 +1538,42 @@ real(dp) function barotrop1D(rhon,x_cell)
   ! rhon is input mass density in g/cc.
   if(analytical_barotrop)then
      temp_polytrope = Tr_floor * ( 1.0d0 + (rhon/n_star)**(gamma-1.0d0) )
-   !   if(nsink>0)then
-   !      call units(scale_l,scale_t,scale_d,scale_v,scale_nH,scale_T2)
-   !    !   write(*,*) 'Barotrop1D: rhon=',rhon,' g/cc'
-   !    !   Kappa_1 = rosseland_ana(rhon, 10.d0, 10.d0, 1.d0, .false.) / rhon
-   !    !   Kappa_2 = rosseland_ana(rhon, 1000.d0, 1000.d0, 1.d0, .false.) / rhon
-   !    !   Kappa_3 = rosseland_ana(rhon, 1000.d0,  10.d0, 1.d0, .false.) / rhon
-   !    !   Kappa_4 = rosseland_ana(rhon, 10.d0, 1000.d0, 1.d0, .false.) / rhon
-   !    !   write(*,*) '1,2,3,4', Kappa_1, Kappa_2, Kappa_3, Kappa_4
+     if(nsink>0)then
+        call units(scale_l,scale_t,scale_d,scale_v,scale_nH,scale_T2)
+      !   write(*,*) 'Barotrop1D: rhon=',rhon,' g/cc'
+      !   Kappa_1 = rosseland_ana(rhon, 10.d0, 10.d0, 1.d0, .false.) / rhon
+      !   Kappa_2 = rosseland_ana(rhon, 1000.d0, 1000.d0, 1.d0, .false.) / rhon
+      !   Kappa_3 = rosseland_ana(rhon, 1000.d0,  10.d0, 1.d0, .false.) / rhon
+      !   Kappa_4 = rosseland_ana(rhon, 10.d0, 1000.d0, 1.d0, .false.) / rhon
+      !   write(*,*) '1,2,3,4', Kappa_1, Kappa_2, Kappa_3, Kappa_4
 
-   !      T_poly_K = temp_polytrope
-   !      distance_sink_code = cell_sink_distance(x_cell) !PLW TEST1
-   !    !   write(*,*) 'distance_sink_code=',distance_sink_code,' code units'
+        T_poly_K = temp_polytrope
+        distance_sink_code = cell_sink_distance(x_cell) !PLW TEST1
+      !   write(*,*) 'distance_sink_code=',distance_sink_code,' code units'
 
-   !      if(distance_sink_code>0.0d0 .and. distance_sink_code<huge(1.0d0))then
-   !         distance_sink_cgs  =  distance_sink_code * scale_l 
+        if(distance_sink_code>0.0d0 .and. distance_sink_code<huge(1.0d0))then
+           distance_sink_cgs  =  distance_sink_code * scale_l 
 
-   !       !   kappa_IR_loc = rosseland_ana(rhon, T_poly_K, T_poly_K, 1, .false.) / rhon
-   !       !   write(*,*) 'Barotrop1D: kappa_IR_loc=',kappa_IR_loc,' cm^2/g'
-   !       !   write(*,*) 'Barotrop1D: rho=',rhon,' g/cc, distance_sink=',distance_sink_cgs,' cm, kappa_IR_loc=',kappa_IR_loc,' cm^2/g'
-   !       !   tau_sink = kappa_avg * rho_0 *((1.0d0/(au*0.12_dp))-(1.0d0/distance_sink_cgs)) * (au*0.12_dp)**2 !distance_sink_cgs
-   !       !   tau_sink = max(tau_sink,0.0d0)
-   !       !   write(*,*) 'Barotrop1D: distance_sink_AU=',distance_sink_cgs/au,' AU'
-   !       !   write(*,*) 'Barotrop1D: tau_sink=',tau_sink
+           kappa_IR_loc = rosseland_ana(rhon, T_poly_K, T_poly_K, 1, .false.) / rhon
+         !   write(*,*) 'Barotrop1D: kappa_IR_loc=',kappa_IR_loc,' cm^2/g'
+         !   write(*,*) 'Barotrop1D: rho=',rhon,' g/cc, distance_sink=',distance_sink_cgs,' cm, kappa_IR_loc=',kappa_IR_loc,' cm^2/g'
+         !   tau_sink = kappa_avg * rho_0 *((1.0d0/(au*0.12_dp))-(1.0d0/distance_sink_cgs)) * (au*0.12_dp)**2 !distance_sink_cgs
+         !   tau_sink = max(tau_sink,0.0d0)
+         !   write(*,*) 'Barotrop1D: distance_sink_AU=',distance_sink_cgs/au,' AU'
+         !   write(*,*) 'Barotrop1D: tau_sink=',tau_sink
 
-   !         flux_star = L_star / (4.0d0*pi*distance_sink_cgs**2) !* exp(-tau_sink) PLW spherical model
-   !         T_kappa_K =  (flux_star / (4.0d0 * sigma_sb))**0.25_dp !(kappa_IR_loc / kappa_avg) *
-   !       !   T_tot_K = ( T_poly_K**4 + T_kappa_K**4 )**0.25_dp
-   !         T_tot_K = max(T_poly_K, T_kappa_K) !Max test 
-   !         barotrop1D = T_tot_K
-   !       !   write(*,*) 'Barotrop1D: rho=',rhon,' g/cc, T_poly=',T_poly_K,' K, T_kappa=',T_kappa_K,' K, T_tot=',T_tot_K,' K'
-   !      else
-   !         barotrop1D = temp_polytrope
-      !   endif
-   !   else
+           flux_star = L_star / (4.0d0*pi*distance_sink_cgs**2) !* exp(-tau_sink) PLW spherical model
+           T_kappa_K =  (kappa_IR_loc / kappa_avg) * (flux_star / (4.0d0 * sigma_sb))**0.25_dp !
+         !   T_tot_K = ( T_poly_K**4 + T_kappa_K**4 )**0.25_dp
+           T_tot_K = max(T_poly_K, T_kappa_K) !Max test 
+           barotrop1D = T_tot_K
+         !   write(*,*) 'Barotrop1D: rho=',rhon,' g/cc, T_poly=',T_poly_K,' K, T_kappa=',T_kappa_K,' K, T_tot=',T_tot_K,' K'
+        else
+           barotrop1D = temp_polytrope
+        endif
+     else
         barotrop1D = temp_polytrope
-   !   endif
+     endif
 
   else
      inp=rhon ! in g.cc
