@@ -1585,7 +1585,7 @@ real(dp) function barotrop1D(rhon,x_cell)
 end function barotrop1D
 
 function cell_sink_distance(x_cell) result(dist)
-  use amr_parameters, only: dp, ndim
+  use amr_parameters, only: dp, ndim, nlevelmax
   use amr_commons,   only: boxlen, nx, ny, nz
   use pm_commons,    only: xsink
   use pm_parameters, only: nsink
@@ -1594,6 +1594,7 @@ function cell_sink_distance(x_cell) result(dist)
   real(dp), intent(in) :: x_cell(1:ndim)
   real(dp)             :: dist
   real(dp)             :: dx_loc(1:ndim)
+  real(dp)             :: dist_floor
   logical              :: period(1:ndim)
   integer              :: idim
   integer, parameter   :: isink = 1   ! single sink assumed
@@ -1620,6 +1621,9 @@ function cell_sink_distance(x_cell) result(dist)
      dist = dist + dx_loc(idim)**2
   end do
   dist = sqrt(dist)
+  dist_floor = 0.5_dp * boxlen * 0.5_dp**real(nlevelmax,dp)
+!   write()(*,*) 'cell_sink_distance=',dist,' floor=',dist_floor
+  dist = max(dist, dist_floor)
 !   write(*,*) 'cell_sink_distance=',dist
 
 end function cell_sink_distance
