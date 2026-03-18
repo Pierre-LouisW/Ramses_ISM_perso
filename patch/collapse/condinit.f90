@@ -623,7 +623,7 @@ subroutine condinit(x,u,dx,nn)
               ! PLW Apply M=2 perturbation around the tilted rotation axis, even if bb_test=.false.
               q(i,1) = q(i,1) * (1.0d0 + delta_rho * &
      &                 cos(2.0d0*atan((x(i,2)) /(cos(theta_mag_radians)*x(i,1)-sin(theta_mag_radians)*x(i,3)))))
-               write(*,*) 'max density with perturbation ',q(i,1)
+              ! write(*,*) 'max density with perturbation ',q(i,1)
            endif
            sum_dust = 0.0d0
 #if NDUST>0
